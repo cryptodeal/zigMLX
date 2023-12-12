@@ -155,8 +155,8 @@ mlx_err fromPtr(mlx_array *res, void *data, const int *shape, size_t shape_len,
       new_array = new array(arr);
     }
     case mlx_dtype::float16: {
-      auto arr =
-          array(static_cast<_Float16 *>(data), shape_vec, dtypeFromEnum(dtype));
+      auto arr = array(static_cast<float16_t *>(data), shape_vec,
+                       dtypeFromEnum(dtype));
       new_array = new array(arr);
     }
     case mlx_dtype::float32: {
