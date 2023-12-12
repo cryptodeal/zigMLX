@@ -23,3 +23,15 @@ test "MLX -> randomNormal" {
     try MLX_CHECK(mlx.randomNormal(&arr, shape.ptr, shape.len, mlx.float32), @src());
     defer mlx.destroyArray(arr);
 }
+
+test "MLX -> fromSlice" {
+    const shape: []const c_int = &.{10};
+    const data: []const f32 = &.{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+    var arr: mlx.mlx_array = null;
+    try MLX_CHECK(mlx.fromPtr(&arr, data.ptr, shape.ptr, shape.len, mlx.float32), @src());
+    defer mlx.destroyArray(arr);
+    var ptr: ?*anyopaque = null;
+    try MLX_CHECK(mlx.data(&ptr, arr), @src());
+    const array_data: []f32 = @as([*c]f32, @ptrCast(@alignCast(ptr)))[0..10];
+    try std.testing.expectEqualSlices(f32, data, array_data);
+}
