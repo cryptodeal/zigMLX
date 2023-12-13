@@ -1,6 +1,8 @@
 #include <cmath>
 #include <exception>
 #include <iostream>
+#include <memory>
+#include <numeric>
 
 #include "mlx/mlx.h"
 #include "mlx_types.h"
@@ -50,11 +52,41 @@ Dtype dtypeFromEnum(mlx_dtype dtype_enum) {
   }
 }
 
+mlx_dtype enumFromDtype(Dtype val) {
+  switch (val) {
+  case mlx::core::bool_:
+    return mlx_dtype::bool_;
+  case mlx::core::uint8:
+    return mlx_dtype::uint8;
+  case mlx::core::uint16:
+    return mlx_dtype::uint16;
+  case mlx::core::uint32:
+    return mlx_dtype::uint32;
+  case mlx::core::uint64:
+    return mlx_dtype::uint64;
+  case mlx::core::int8:
+    return mlx_dtype::int8;
+  case mlx::core::int16:
+    return mlx_dtype::int16;
+  case mlx::core::int32:
+    return mlx_dtype::int32;
+  case mlx::core::int64:
+    return mlx_dtype::int64;
+  case mlx::core::float16:
+    return mlx_dtype::float16;
+  case mlx::core::float32:
+    return mlx_dtype::float32;
+  case mlx::core::bfloat16:
+    return mlx_dtype::bfloat16;
+  // TODO: case mlx_dtype::complex64:
+  default:
+    throw std::invalid_argument("Invalid dtype enum");
+  }
+}
+
 extern "C" {
 
-void destroyArray(mlx_array array_handle) {
-  delete static_cast<array *>(array_handle);
-}
+void destroyArray(mlx_array arr) { delete static_cast<array *>(arr); }
 
 mlx_err seed(uint64_t seed) {
   std::exception_ptr eptr;
@@ -81,8 +113,7 @@ mlx_err fromScalar(mlx_array *res, double val, mlx_dtype dtype) {
 mlx_err fromScalarI64(mlx_array *res, int64_t val) {
   std::exception_ptr eptr;
   try {
-    auto arr = array(val);
-    mlx_array new_array = new array(arr);
+    mlx_array new_array = new array(val, mlx::core::int64);
     std::swap(*res, new_array);
   } catch (...) {
     eptr = std::current_exception(); // capture
@@ -93,9 +124,356 @@ mlx_err fromScalarI64(mlx_array *res, int64_t val) {
 mlx_err fromScalarU64(mlx_array *res, uint64_t val) {
   std::exception_ptr eptr;
   try {
-    auto arr = array(val);
+    mlx_array new_array = new array(val, mlx::core::uint64);
+    std::swap(*res, new_array);
+  } catch (...) {
+    eptr = std::current_exception(); // capture
+  }
+  return handle_eptr(eptr);
+}
+
+mlx_err initHandle(mlx_array *res, const void *shape, size_t shape_len,
+                   mlx_dtype dtype) {
+  std::exception_ptr eptr;
+  try {
+    auto shape_int = reinterpret_cast<const int *>(shape);
+    std::vector<int> shape_vec(shape_int, shape_int + shape_len);
+    auto data_type = dtypeFromEnum(dtype);
+    const int product = std::accumulate(shape_vec.begin(), shape_vec.end(), 1,
+                                        std::multiplies<int>());
+    auto buffer = allocator::malloc(product * size_of(data_type));
+    mlx_array new_array = new array(buffer, shape_vec, data_type);
+    std::swap(*res, new_array);
+  } catch (...) {
+    eptr = std::current_exception(); // capture
+  }
+  return handle_eptr(eptr);
+}
+
+mlx_err initEmpty(mlx_array *res) {
+  std::exception_ptr eptr;
+  try {
+    mlx_array new_array = new array({});
+    std::swap(*res, new_array);
+  } catch (...) {
+    eptr = std::current_exception(); // capture
+  }
+  return handle_eptr(eptr);
+}
+
+mlx_err fromPtr(mlx_array *res, const void *data, const void *shape,
+                size_t shape_len, mlx_dtype dtype) {
+  std::exception_ptr eptr;
+  try {
+    auto shape_int = reinterpret_cast<const int *>(shape);
+    std::vector<int> shape_vec(shape_int, shape_int + shape_len);
+    mlx_array new_array;
+    switch (dtype) {
+    case mlx_dtype::bool_: {
+      new_array = new array(static_cast<const bool *>(data), shape_vec,
+                            mlx::core::bool_);
+      break;
+    }
+    case mlx_dtype::uint8: {
+      new_array = new array(static_cast<const uint8_t *>(data), shape_vec,
+                            mlx::core::uint8);
+      break;
+    }
+    case mlx_dtype::uint16: {
+      new_array = new array(static_cast<const uint16_t *>(data), shape_vec,
+                            mlx::core::uint16);
+      break;
+    }
+    case mlx_dtype::uint32: {
+      new_array = new array(static_cast<const uint32_t *>(data), shape_vec,
+                            mlx::core::uint32);
+      break;
+    }
+    case mlx_dtype::uint64: {
+      new_array = new array(static_cast<const uint64_t *>(data), shape_vec,
+                            mlx::core::uint64);
+      break;
+    }
+    case mlx_dtype::int8: {
+      new_array = new array(static_cast<const int8_t *>(data), shape_vec,
+                            mlx::core::int8);
+      break;
+    }
+    case mlx_dtype::int16: {
+      new_array = new array(static_cast<const int16_t *>(data), shape_vec,
+                            mlx::core::int16);
+      break;
+    }
+    case mlx_dtype::int32: {
+      new_array = new array(static_cast<const int32_t *>(data), shape_vec,
+                            mlx::core::int32);
+      break;
+    }
+    case mlx_dtype::int64: {
+      new_array = new array(static_cast<const int64_t *>(data), shape_vec,
+                            mlx::core::int64);
+      break;
+    }
+    case mlx_dtype::float16: {
+      new_array = new array(static_cast<const float16_t *>(data), shape_vec,
+                            mlx::core::float16);
+      break;
+    }
+    case mlx_dtype::float32: {
+      new_array = new array(static_cast<const float *>(data), shape_vec,
+                            mlx::core::float32);
+      break;
+    }
+    case mlx_dtype::bfloat16: {
+      new_array = new array(static_cast<const bfloat16_t *>(data), shape_vec,
+                            mlx::core::bfloat16);
+      break;
+    }
+    // TODO: case mlx_dtype::complex64:
+    default: {
+      throw std::invalid_argument("Invalid dtype enum: " +
+                                  std::to_string(dtype));
+    }
+    }
+    std::swap(*res, new_array);
+  } catch (...) {
+    eptr = std::current_exception(); // capture
+  }
+  return handle_eptr(eptr);
+}
+
+mlx_err randomNormal(mlx_array *res, const void *shape, size_t shape_len,
+                     mlx_dtype dtype) {
+  std::exception_ptr eptr;
+
+  try {
+    auto shape_int = reinterpret_cast<const int *>(shape);
+    std::vector<int> shape_vec(shape_int, shape_int + shape_len);
+    auto arr = random::normal(shape_vec, dtypeFromEnum(dtype));
     mlx_array new_array = new array(arr);
     std::swap(*res, new_array);
+  } catch (...) {
+    eptr = std::current_exception(); // capture
+  }
+  return handle_eptr(eptr);
+}
+
+mlx_err itemsize(size_t *res, mlx_array arr) {
+  std::exception_ptr eptr;
+  try {
+    auto a = static_cast<array *>(arr);
+    *res = a->itemsize();
+  } catch (...) {
+    eptr = std::current_exception(); // capture
+  }
+  return handle_eptr(eptr);
+}
+
+mlx_err size(size_t *res, mlx_array arr) {
+  std::exception_ptr eptr;
+  try {
+    auto a = static_cast<array *>(arr);
+    *res = a->size();
+  } catch (...) {
+    eptr = std::current_exception(); // capture
+  }
+  return handle_eptr(eptr);
+}
+
+mlx_err nbytes(size_t *res, mlx_array arr) {
+  std::exception_ptr eptr;
+  try {
+    auto a = static_cast<array *>(arr);
+    *res = a->nbytes();
+  } catch (...) {
+    eptr = std::current_exception(); // capture
+  }
+  return handle_eptr(eptr);
+}
+
+mlx_err ndim(size_t *res, mlx_array arr) {
+  std::exception_ptr eptr;
+  try {
+    auto a = static_cast<array *>(arr);
+    *res = a->ndim();
+  } catch (...) {
+    eptr = std::current_exception(); // capture
+  }
+  return handle_eptr(eptr);
+}
+
+mlx_err shape(void **res, mlx_array arr) {
+  std::exception_ptr eptr;
+  try {
+    auto a = static_cast<array *>(arr);
+    std::vector<int> a_shape = a->shape();
+    *res = a_shape.data();
+  } catch (...) {
+    eptr = std::current_exception(); // capture
+  }
+  return handle_eptr(eptr);
+}
+
+mlx_err dim(int *res, int dimension, mlx_array arr) {
+  std::exception_ptr eptr;
+  try {
+    auto a = static_cast<array *>(arr);
+    *res = a->shape(dimension);
+  } catch (...) {
+    eptr = std::current_exception(); // capture
+  }
+  return handle_eptr(eptr);
+}
+
+mlx_err strides(void **res, size_t *stride_len, mlx_array arr) {
+  std::exception_ptr eptr;
+  try {
+    auto a = static_cast<array *>(arr);
+    std::vector<size_t> a_strides = a->strides();
+    *stride_len = a_strides.size();
+    *res = a_strides.data();
+  } catch (...) {
+    eptr = std::current_exception(); // capture
+  }
+  return handle_eptr(eptr);
+}
+
+mlx_err dtype(mlx_dtype *res, mlx_array arr) {
+  std::exception_ptr eptr;
+  try {
+    auto a = static_cast<array *>(arr);
+    *res = enumFromDtype(a->dtype());
+  } catch (...) {
+    eptr = std::current_exception(); // capture
+  }
+  return handle_eptr(eptr);
+}
+
+mlx_err eval(bool retain_graph, mlx_array arr) {
+  std::exception_ptr eptr;
+  try {
+    auto a = static_cast<array *>(arr);
+    a->eval(retain_graph);
+  } catch (...) {
+    eptr = std::current_exception(); // capture
+  }
+  return handle_eptr(eptr);
+}
+
+mlx_err item(void **res, bool retain_graph, mlx_array arr) {
+  std::exception_ptr eptr;
+  try {
+    auto a = static_cast<array *>(arr);
+    switch (a->dtype()) {
+    case mlx::core::bool_: {
+      static_cast<bool *>(*res)[0] = a->item<bool>(retain_graph);
+      break;
+    }
+    case mlx::core::uint8: {
+      static_cast<uint8_t *>(*res)[0] = a->item<uint8_t>(retain_graph);
+      break;
+    }
+    case mlx::core::uint16: {
+      static_cast<uint16_t *>(*res)[0] = a->item<uint16_t>(retain_graph);
+      break;
+    }
+    case mlx::core::uint32: {
+      static_cast<uint32_t *>(*res)[0] = a->item<uint32_t>(retain_graph);
+      break;
+    }
+    case mlx::core::uint64: {
+      static_cast<uint64_t *>(*res)[0] = a->item<uint64_t>(retain_graph);
+      break;
+    }
+    case mlx::core::int8: {
+      static_cast<int8_t *>(*res)[0] = a->item<int8_t>(retain_graph);
+      break;
+    }
+    case mlx::core::int16: {
+      static_cast<int16_t *>(*res)[0] = a->item<int16_t>(retain_graph);
+      break;
+    }
+    case mlx::core::int32: {
+      static_cast<int32_t *>(*res)[0] = a->item<int32_t>(retain_graph);
+      break;
+    }
+    case mlx::core::int64: {
+      static_cast<int64_t *>(*res)[0] = a->item<int64_t>(retain_graph);
+      break;
+    }
+    case mlx::core::float16: {
+      static_cast<float16_t *>(*res)[0] = a->item<float16_t>(retain_graph);
+      break;
+    }
+    case mlx::core::float32: {
+      static_cast<float *>(*res)[0] = a->item<float>(retain_graph);
+      break;
+    }
+    case mlx::core::bfloat16: {
+      static_cast<bfloat16_t *>(*res)[0] = a->item<bfloat16_t>(retain_graph);
+      break;
+    }
+    // TODO: case mlx_dtype::complex64:
+    default: {
+      throw std::invalid_argument("Unhandled dtype");
+    }
+    }
+  } catch (...) {
+    eptr = std::current_exception(); // capture
+  }
+  return handle_eptr(eptr);
+}
+
+// TODO: mlx_err begin(void *res, mlx_array arr) {}
+
+// TODO: mlx_err end(void *res, mlx_array arr) {}
+
+mlx_err id(size_t *res, mlx_array arr) {
+  std::exception_ptr eptr;
+  try {
+    auto a = static_cast<array *>(arr);
+    *res = a->id();
+  } catch (...) {
+    eptr = std::current_exception(); // capture
+  }
+  return handle_eptr(eptr);
+}
+
+// TODO: mlx_err primitive(void *res, mlx_array arr) {}
+
+mlx_err has_primitive(bool *res, mlx_array arr) {
+  std::exception_ptr eptr;
+  try {
+    auto a = static_cast<array *>(arr);
+    *res = a->has_primitive();
+  } catch (...) {
+    eptr = std::current_exception(); // capture
+  }
+  return handle_eptr(eptr);
+}
+
+// TODO: mlx_err inputs() {}
+
+// TODO: mlx_err editable_inputs() {}
+
+mlx_err detach(mlx_array arr) {
+  std::exception_ptr eptr;
+  try {
+    auto a = static_cast<array *>(arr);
+    a->detach();
+  } catch (...) {
+    eptr = std::current_exception(); // capture
+  }
+  return handle_eptr(eptr);
+}
+
+// TODO: mlx_err flags(void *res, mlx_array arr) {}
+
+mlx_err data_size(size_t *res, mlx_array arr) {
+  std::exception_ptr eptr;
+  try {
+    auto a = static_cast<array *>(arr);
+    *res = a->data_size();
   } catch (...) {
     eptr = std::current_exception(); // capture
   }
@@ -168,105 +546,22 @@ mlx_err data(void **res, mlx_array arr) {
   return handle_eptr(eptr);
 }
 
-mlx_err fromPtr(mlx_array *res, const void *data, const int *shape, size_t shape_len,
-                mlx_dtype dtype) {
+mlx_err is_evaled(bool *res, mlx_array arr) {
   std::exception_ptr eptr;
   try {
-    std::vector<int> shape_vec(shape, shape + shape_len);
-    mlx_array new_array;
-    switch (dtype) {
-    case mlx_dtype::bool_: {
-      auto arr = array(static_cast<const bool *>(data), shape_vec, mlx::core::bool_);
-      new_array = new array(arr);
-      break;
-    }
-    case mlx_dtype::uint8: {
-      auto arr =
-          array(static_cast<const uint8_t *>(data), shape_vec, mlx::core::uint8);
-      new_array = new array(arr);
-      break;
-    }
-    case mlx_dtype::uint16: {
-      auto arr =
-          array(static_cast<const uint16_t *>(data), shape_vec, mlx::core::uint16);
-      new_array = new array(arr);
-      break;
-    }
-    case mlx_dtype::uint32: {
-      auto arr =
-          array(static_cast<const uint32_t *>(data), shape_vec, mlx::core::uint32);
-      new_array = new array(arr);
-      break;
-    }
-    case mlx_dtype::uint64: {
-      auto arr =
-          array(static_cast<const uint64_t *>(data), shape_vec, mlx::core::uint64);
-      new_array = new array(arr);
-      break;
-    }
-    case mlx_dtype::int8: {
-      auto arr = array(static_cast<const int8_t *>(data), shape_vec, mlx::core::int8);
-      new_array = new array(arr);
-      break;
-    }
-    case mlx_dtype::int16: {
-      auto arr =
-          array(static_cast<const int16_t *>(data), shape_vec, mlx::core::int16);
-      new_array = new array(arr);
-      break;
-    }
-    case mlx_dtype::int32: {
-      auto arr =
-          array(static_cast<const int32_t *>(data), shape_vec, mlx::core::int32);
-      new_array = new array(arr);
-      break;
-    }
-    case mlx_dtype::int64: {
-      auto arr =
-          array(static_cast<const int64_t *>(data), shape_vec, mlx::core::int64);
-      new_array = new array(arr);
-      break;
-    }
-    case mlx_dtype::float16: {
-      auto arr =
-          array(static_cast<const float16_t *>(data), shape_vec, mlx::core::float16);
-      new_array = new array(arr);
-      break;
-    }
-    case mlx_dtype::float32: {
-      auto arr =
-          array(static_cast<const float *>(data), shape_vec, mlx::core::float32);
-      new_array = new array(arr);
-      break;
-    }
-    case mlx_dtype::bfloat16: {
-      auto arr = array(static_cast<const bfloat16_t *>(data), shape_vec,
-                       mlx::core::bfloat16);
-      new_array = new array(arr);
-      break;
-    }
-    // TODO: case mlx_dtype::complex64:
-    default: {
-      throw std::invalid_argument("Invalid dtype enum: " +
-                                  std::to_string(dtype));
-    }
-    }
-    std::swap(*res, new_array);
+    auto a = static_cast<array *>(arr);
+    *res = a->is_evaled();
   } catch (...) {
     eptr = std::current_exception(); // capture
   }
   return handle_eptr(eptr);
 }
 
-mlx_err randomNormal(mlx_array *res, const int *shape, size_t shape_len,
-                     mlx_dtype dtype) {
+mlx_err set_tracer(bool is_tracer, mlx_array arr) {
   std::exception_ptr eptr;
-
   try {
-    std::vector<int> shape_vec(shape, shape + shape_len);
-    auto arr = random::normal(shape_vec, dtypeFromEnum(dtype));
-    mlx_array new_array = new array(arr);
-    std::swap(*res, new_array);
+    auto a = static_cast<array *>(arr);
+    a->set_tracer(is_tracer);
   } catch (...) {
     eptr = std::current_exception(); // capture
   }

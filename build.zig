@@ -23,9 +23,8 @@ fn addLibInfo(allocator: std.mem.Allocator, c: *std.Build.Step.Compile, path_inf
             break :find_path line[v + match.len ..];
         }
     } else null;
-    if (path) |p| {
-        std.debug.print("path: {s}\n", .{path.?});
 
+    if (path) |p| {
         const include: []const u8 = "/mlx/include";
         const lib: []const u8 = "/mlx/lib";
         var lib_path = try allocator.alloc(u8, p.len + lib.len);
@@ -40,6 +39,8 @@ fn addLibInfo(allocator: std.mem.Allocator, c: *std.Build.Step.Compile, path_inf
         @memcpy(include_path[p.len..], include);
         c.addIncludePath(.{ .path = include_path });
         c.linkSystemLibrary("mlx");
+    } else {
+        return error.MLXPathNotFound;
     }
 }
 
@@ -104,4 +105,12 @@ pub fn build(b: *std.Build) !void {
 
     const test_step = b.step("test", "Run library tests");
     test_step.dependOn(&run_main_tests.step);
+
+    const clang_fmt = b.addSystemCommand(&[_][]const u8{ "clang-format", "-i", "bindings/mlx_types.h", "bindings/mlx.cc", "bindings/mlx.h" });
+    const zig_fmt = b.addSystemCommand(&[_][]const u8{ "zig", "fmt", "." });
+    zig_fmt.step.dependOn(&clang_fmt.step);
+    test_step.dependOn(&run_main_tests.step);
+
+    const fmt_step = b.step("fmt", "Format library C and Zig code");
+    fmt_step.dependOn(&zig_fmt.step);
 }
