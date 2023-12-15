@@ -3,6 +3,7 @@
 #include <iostream>
 #include <memory>
 #include <numeric>
+#include <stdlib.h>
 
 #include "mlx/mlx.h"
 #include "mlx_types.h"
@@ -88,10 +89,61 @@ extern "C" {
 
 void destroyArray(mlx_array arr) { delete static_cast<array *>(arr); }
 
+void destroyArrayIterator(mlx_array_iterator iter) {
+  delete static_cast<array::ArrayIterator*>(iter);
+}
+
+
 mlx_err seed(uint64_t seed) {
   std::exception_ptr eptr;
   try {
     random::seed(seed);
+  } catch (...) {
+    eptr = std::current_exception(); // capture
+  }
+  return handle_eptr(eptr);
+}
+
+mlx_err nextDiff(mlx_array_iterator iter, size_t diff) {
+  std::exception_ptr eptr;
+  try {
+    auto i = static_cast<array::ArrayIterator *>(iter);
+    auto tmp = i + diff;
+  } catch (...) {
+    eptr = std::current_exception(); // capture
+  }
+  return handle_eptr(eptr);
+}
+
+mlx_err next(mlx_array_iterator iter) {
+  std::exception_ptr eptr;
+  try {
+    auto i = static_cast<array::ArrayIterator *>(iter);
+    i++;
+  } catch (...) {
+    eptr = std::current_exception(); // capture
+  }
+  return handle_eptr(eptr);
+}
+
+mlx_err arrayIterEql(bool *res, mlx_array_iterator a, mlx_array_iterator b) {
+  std::exception_ptr eptr;
+  try {
+    auto iter_a = static_cast<array::ArrayIterator *>(a);
+    auto iter_b = static_cast<array::ArrayIterator *>(b);
+    *res = (*iter_a) == (*iter_b);
+  } catch (...) {
+    eptr = std::current_exception(); // capture
+  }
+  return handle_eptr(eptr);
+}
+
+mlx_err arrayIterNeq(bool *res, mlx_array_iterator a, mlx_array_iterator b) {
+  std::exception_ptr eptr;
+  try {
+    auto iter_a = static_cast<array::ArrayIterator *>(a);
+    auto iter_b = static_cast<array::ArrayIterator *>(b);
+    *res = (*iter_a) != (*iter_b);
   } catch (...) {
     eptr = std::current_exception(); // capture
   }
@@ -349,7 +401,7 @@ mlx_err dtype(mlx_dtype *res, mlx_array arr) {
   return handle_eptr(eptr);
 }
 
-mlx_err eval(bool retain_graph, mlx_array arr) {
+mlx_err eval_array(bool retain_graph, mlx_array arr) {
   std::exception_ptr eptr;
   try {
     auto a = static_cast<array *>(arr);
@@ -360,57 +412,57 @@ mlx_err eval(bool retain_graph, mlx_array arr) {
   return handle_eptr(eptr);
 }
 
-mlx_err item(void **res, bool retain_graph, mlx_array arr) {
+mlx_err item(void *res, bool retain_graph, mlx_array arr) {
   std::exception_ptr eptr;
   try {
     auto a = static_cast<array *>(arr);
     switch (a->dtype()) {
     case mlx::core::bool_: {
-      static_cast<bool *>(*res)[0] = a->item<bool>(retain_graph);
+      *(static_cast<bool *>(res)) = a->item<bool>(retain_graph);
       break;
     }
     case mlx::core::uint8: {
-      static_cast<uint8_t *>(*res)[0] = a->item<uint8_t>(retain_graph);
+      *(static_cast<uint8_t *>(res)) = a->item<uint8_t>(retain_graph);
       break;
     }
     case mlx::core::uint16: {
-      static_cast<uint16_t *>(*res)[0] = a->item<uint16_t>(retain_graph);
+      *(static_cast<uint16_t *>(res)) = a->item<uint16_t>(retain_graph);
       break;
     }
     case mlx::core::uint32: {
-      static_cast<uint32_t *>(*res)[0] = a->item<uint32_t>(retain_graph);
+      *(static_cast<uint32_t *>(res)) = a->item<uint32_t>(retain_graph);
       break;
     }
     case mlx::core::uint64: {
-      static_cast<uint64_t *>(*res)[0] = a->item<uint64_t>(retain_graph);
+      *(static_cast<uint64_t *>(res)) = a->item<uint64_t>(retain_graph);
       break;
     }
     case mlx::core::int8: {
-      static_cast<int8_t *>(*res)[0] = a->item<int8_t>(retain_graph);
+      *(static_cast<int8_t *>(res)) = a->item<int8_t>(retain_graph);
       break;
     }
     case mlx::core::int16: {
-      static_cast<int16_t *>(*res)[0] = a->item<int16_t>(retain_graph);
+      *(static_cast<int16_t *>(res)) = a->item<int16_t>(retain_graph);
       break;
     }
     case mlx::core::int32: {
-      static_cast<int32_t *>(*res)[0] = a->item<int32_t>(retain_graph);
+      *(static_cast<int32_t *>(res)) = a->item<int32_t>(retain_graph);
       break;
     }
     case mlx::core::int64: {
-      static_cast<int64_t *>(*res)[0] = a->item<int64_t>(retain_graph);
+      *(static_cast<int64_t *>(res)) = a->item<int64_t>(retain_graph);
       break;
     }
     case mlx::core::float16: {
-      static_cast<float16_t *>(*res)[0] = a->item<float16_t>(retain_graph);
+      *(static_cast<float16_t *>(res)) = a->item<float16_t>(retain_graph);
       break;
     }
     case mlx::core::float32: {
-      static_cast<float *>(*res)[0] = a->item<float>(retain_graph);
+      *(static_cast<float *>(res)) = a->item<float>(retain_graph);
       break;
     }
     case mlx::core::bfloat16: {
-      static_cast<bfloat16_t *>(*res)[0] = a->item<bfloat16_t>(retain_graph);
+      *(static_cast<bfloat16_t *>(res)) = a->item<bfloat16_t>(retain_graph);
       break;
     }
     // TODO: case mlx_dtype::complex64:
@@ -424,9 +476,29 @@ mlx_err item(void **res, bool retain_graph, mlx_array arr) {
   return handle_eptr(eptr);
 }
 
-// TODO: mlx_err begin(void *res, mlx_array arr) {}
+mlx_err begin(mlx_array_iterator *res, mlx_array arr) {
+  std::exception_ptr eptr;
+  try {
+    auto a = static_cast<array *>(arr);
+    array::ArrayIterator *iter = new array::ArrayIterator(*a);
+    *res = iter;
+  } catch (...) {
+    eptr = std::current_exception(); // capture
+  }
+  return handle_eptr(eptr);
+}
 
-// TODO: mlx_err end(void *res, mlx_array arr) {}
+mlx_err end(mlx_array_iterator *res, mlx_array arr) {
+  std::exception_ptr eptr;
+  try {
+    auto a = static_cast<array *>(arr);
+    array::ArrayIterator *iter = new array::ArrayIterator(*a, a->shape(0));
+    *res = iter;
+  } catch (...) {
+    eptr = std::current_exception(); // capture
+  }
+  return handle_eptr(eptr);
+}
 
 mlx_err id(size_t *res, mlx_array arr) {
   std::exception_ptr eptr;
@@ -439,7 +511,16 @@ mlx_err id(size_t *res, mlx_array arr) {
   return handle_eptr(eptr);
 }
 
-// TODO: mlx_err primitive(void *res, mlx_array arr) {}
+mlx_err primitive(mlx_primitive *res, mlx_array arr) {
+  std::exception_ptr eptr;
+  try {
+    auto a = static_cast<array *>(arr);
+    *res = &(a->primitive());
+  } catch (...) {
+    eptr = std::current_exception(); // capture
+  }
+  return handle_eptr(eptr);
+}
 
 mlx_err has_primitive(bool *res, mlx_array arr) {
   std::exception_ptr eptr;
@@ -467,7 +548,19 @@ mlx_err detach(mlx_array arr) {
   return handle_eptr(eptr);
 }
 
-// TODO: mlx_err flags(void *res, mlx_array arr) {}
+mlx_err flags(mlx_array_flags *res, mlx_array arr) {
+  std::exception_ptr eptr;
+  try {
+    auto a = static_cast<array *>(arr);
+    auto flags = a->flags();
+    res->contiguous = flags.contiguous;
+    res->row_contiguous = flags.row_contiguous;
+    res->col_contiguous = flags.col_contiguous;
+  } catch (...) {
+    eptr = std::current_exception(); // capture
+  }
+  return handle_eptr(eptr);
+}
 
 mlx_err data_size(size_t *res, mlx_array arr) {
   std::exception_ptr eptr;
@@ -562,6 +655,61 @@ mlx_err set_tracer(bool is_tracer, mlx_array arr) {
   try {
     auto a = static_cast<array *>(arr);
     a->set_tracer(is_tracer);
+  } catch (...) {
+    eptr = std::current_exception(); // capture
+  }
+  return handle_eptr(eptr);
+}
+
+mlx_err add(mlx_array *res, mlx_array lhs, mlx_array rhs) {
+  std::exception_ptr eptr;
+  try {
+    auto lhs_array = static_cast<array *>(lhs);
+    auto rhs_array = static_cast<array *>(rhs);
+    array tmp = mlx::core::add(*lhs_array, *rhs_array);
+    *res = new array(tmp);
+  } catch (...) {
+    eptr = std::current_exception(); // capture
+  }
+  return handle_eptr(eptr);
+}
+
+mlx_err subtract(mlx_array *res, mlx_array lhs, mlx_array rhs) {
+  std::exception_ptr eptr;
+  try {
+    auto lhs_array = static_cast<array *>(lhs);
+    auto rhs_array = static_cast<array *>(rhs);
+    auto tmp = mlx::core::subtract(*lhs_array, *rhs_array);
+    mlx_array new_array = new array(tmp);
+    std::swap(*res, new_array);
+  } catch (...) {
+    eptr = std::current_exception(); // capture
+  }
+  return handle_eptr(eptr);
+}
+
+mlx_err multiply(mlx_array *res, mlx_array lhs, mlx_array rhs) {
+  std::exception_ptr eptr;
+  try {
+    auto lhs_array = static_cast<array *>(lhs);
+    auto rhs_array = static_cast<array *>(rhs);
+    auto tmp = mlx::core::multiply(*lhs_array, *rhs_array);
+    mlx_array new_array = new array(tmp);
+    std::swap(*res, new_array);
+  } catch (...) {
+    eptr = std::current_exception(); // capture
+  }
+  return handle_eptr(eptr);
+}
+
+mlx_err divide(mlx_array *res, mlx_array lhs, mlx_array rhs) {
+  std::exception_ptr eptr;
+  try {
+    auto lhs_array = static_cast<array *>(lhs);
+    auto rhs_array = static_cast<array *>(rhs);
+    auto tmp = mlx::core::divide(*lhs_array, *rhs_array);
+    mlx_array new_array = new array(tmp);
+    std::swap(*res, new_array);
   } catch (...) {
     eptr = std::current_exception(); // capture
   }

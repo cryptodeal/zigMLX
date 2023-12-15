@@ -21,4 +21,13 @@ typedef enum {
   complex64,
 } mlx_dtype;
 
+typedef struct mlx_array_flags {
+  bool contiguous;
+
+  bool row_contiguous;
+  bool col_contiguous;
+} mlx_array_flags;
+
 typedef void *mlx_array;
+typedef void *mlx_array_iterator;
+typedef void *mlx_primitive;

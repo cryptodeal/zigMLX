@@ -49,7 +49,7 @@ pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
 
     // install mlx via pip
-    const install_mlx = b.addSystemCommand(&[_][]const u8{ "pip", "install", "mlx" });
+    const install_mlx = b.addSystemCommand(&[_][]const u8{ "pip", "install", "mlx", "-U" });
     // get location of mlx install
     const mlx_loc = b.addSystemCommand(&[_][]const u8{ "pip", "show", "mlx" });
     mlx_loc.step.dependOn(&install_mlx.step);
